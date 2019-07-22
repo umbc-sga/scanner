@@ -1,44 +1,93 @@
-var userData;
-var eventRef;
+// Script globals
+var spreadsheetID = "";
+var isLoggedIn = false;
+var scannedCodes = [];
+
+// Client ID and API key from the Developer Console
+var CLIENT_ID = '472938835007-rrt6ml2b8ddt23s8aa1ntop144l2nbu8.apps.googleusercontent.com';
+var API_KEY = 'AIzaSyDf-X1sVw3JHo81BHNzYEE8nb7Slk0jmnU';
+
+// Array of API discovery doc URLs for APIs used by the quickstart
+var DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
+
+// Authorization scopes required by the API; multiple scopes can be
+// included, separated by spaces.
+var SCOPES = "https://www.googleapis.com/auth/spreadsheets";
+
+// Signin/signout buttons
+var loginButton = document.getElementById('login_button');
+var signoutButton = document.getElementById('signout_button');
 
 /**
- * When the the page is loaded, start the barcode reader.
- */
-window.addEventListener("DOMContentLoaded", function() {
-    // Add a click listener to the create event button to its corresponding function
-    document.getElementById("createEvent").addEventListener("click", createEvent);
+*  On load, called to load the auth2 library and API client library.
+*/
+function handleClientLoad() {
+    gapi.load('client:auth2', initClient);
+}
 
-    /**
-     * Check if the user has previously logged in.
-     */
-    firebase.auth().onAuthStateChanged(function (user) {
-        // If the user has logged in
-        if (user) {
-            // Save the user data
-            userData = user;
+/**
+*  Initializes the API client library and sets up sign-in state
+*  listeners.
+*/
+function initClient() {
+    gapi.client.init({
+        apiKey: API_KEY,
+        clientId: CLIENT_ID,
+        discoveryDocs: DISCOVERY_DOCS,
+        scope: SCOPES
+    })
+    .then(function() {
+        // Listen for sign-in state changes.
+        gapi.auth2.getAuthInstance().isSignedIn.listen(updateSigninStatus);
 
-            // Display logout as the user action
-            document.getElementById("userAction").addEventListener('click', logout);
-            document.getElementById("userAction").innerHTML = "Logout";
-
-            document.getElementById("createEvent").style.display = "";
-        }
-        // If the user is not logged in
-        else {
-            // Display login as the user action
-            document.getElementById("userAction").addEventListener('click', login);
-            document.getElementById("userAction").innerHTML = "Login";
-        }
+        // Handle the initial sign-in state.
+        updateSigninStatus(gapi.auth2.getAuthInstance().isSignedIn.get());
+        loginButton.onclick = handleAuthClick;
+        signoutButton.onclick = handleSignoutClick;
+    }, 
+    function(error) {
+        console.log(JSON.stringify(error, null, 2));
     });
-});
+}
 
 /**
- * Start the barcode scanning camera.
- */
+*  Called when the signed in status changes, to update the UI
+*  appropriately. After a sign-in, the API is called.
+*/
+function updateSigninStatus(isSignedIn) {
+    isLoggedIn = isSignedIn;
+
+    if (isSignedIn) {
+        loginButton.style.display = 'none';
+        signoutButton.style.display = 'block';
+    } 
+    else {
+        loginButton.style.display = 'block';
+        signoutButton.style.display = 'none';
+    }
+}
+
+/**
+*  Sign in the user upon button click.
+*/
+function handleAuthClick(event) {
+    gapi.auth2.getAuthInstance().signIn();
+}
+
+/**
+*  Sign out the user upon button click.
+*/
+function handleSignoutClick(event) {
+    gapi.auth2.getAuthInstance().signOut();
+}
+
+/**
+* Start the barcode scanning camera.
+*/
 function launchBarcodeCamera() {
     /**
-     * Get all the video devices that the web browswer can access.
-     */
+    * Get all the video devices that the web browser can access.
+    */
     Quagga.CameraAccess.enumerateVideoDevices().then(function (devices) {
         var deviceId;
 
@@ -47,6 +96,7 @@ function launchBarcodeCamera() {
             // If it is the back camera, automatically use that
             if (device.label == "Back Camera") {
                 deviceId = device.deviceId;
+
                 return;
             }
             else
@@ -62,88 +112,122 @@ function launchBarcodeCamera() {
             },
             decoder: { readers: ["codabar_reader"] }
         },
-            function (err) {
-                // Log errors if there are any
-                if (err) console.error(err);
+        function (err) {
+            // Log errors if there are any
+            if (err) console.error(err);
 
-                // Start the barcode reader
-                Quagga.start();
+            // Start the barcode reader
+            Quagga.start();
 
-                // Show the camera view
-                document.getElementById("interactive").style.display = "";
-            });
+            // Show the camera view
+            document.getElementById("interactive").style.display = "";
+        });
     });
 }
 
 /**
- * Create an event, which is how barcodes are separated and stored within the databse.
- */
-function createEvent() {
-    // Launch the barcode scanning camera
+*  Launch the barcode scanning camera and create the event Google Sheet.
+*/
+function startScanning() {
+    // Launch the barcode scanning camera 
     launchBarcodeCamera();
 
-    if (userData) {
-        var eventName = prompt("What is the name of your event?");
+    // Create file name which is today's date + "Scanned IDs"
+    var today = new Date();
+    var fileName = (today.getMonth() + 1) + "/" + today.getDate() + "/" + today.getFullYear() + " Scanned IDs";
 
-        // Connect to the database at a reference point for the user
-        eventRef = firebase.database().ref("users/" + user.uid).push();
-        eventRef.set({
-            'eventName': eventName
-        });
-    }
+    // Create the spreadsheet with the Sheets API
+    gapi.client.sheets.spreadsheets.create({
+        properties: {
+            title: fileName
+        }
+    })
+    .then(function(response) {
+        // Get spreadsheet ID
+        spreadsheetID = response.result.spreadsheetId;
+    });
 }
 
+
 /**
- * Whenever the barcode reader detects a barcode, store it.
- */
-Quagga.onDetected(function (result) {
+*  Listen for whenever a new code is detected.
+*/
+Quagga.onDetected(function(result) {
     // Get the detected barcode
     var code = result.codeResult.code;
 
-    var codesRef = firebase.database().ref("users/" + userData.uid + "/" + eventRef.key() + "/codes");
-    codesRef.push({'code': code, 'time': new Date().getTime()}, function(err) {
-        if (err) {
-            console.error(err);
-        }
-        else {
-            // Show a success alert with the code that was scanned
-            $(".container-fluid").prepend('<div class="alert alert-success" role="alert">Scanned: ' + code + '</div>');
+    // If this code has already been scanned, do not proceed
+    if (scannedCodes.includes(code)) return;
 
-            // Make the alert dismiss after one and a half seconds
-            setTimeout(function () {
-                $(".alert").alert('close');
-            }, 1500);
-        }
+    // Add code to scannedCodes array to keep track of itt
+    scannedCodes.append(code);
+
+    // Create row in same format as what the physical scanner outputs
+    var body = { values: [getDate(), getTime(), "02", code] };
+
+    // Append the row to the spreadsheet
+    gapi.client.sheets.spreadsheets.values.append({
+        spreadsheetId: spreadsheetId,
+        range: range,
+        valueInputOption: valueInputOption,
+        resource: body
+    })
+    .then(function(response) {
+        var result = response.result;
+
+        // Show a success alert with the code that was scanned
+        $(".container-fluid").prepend('<div class="alert alert-success" role="alert">Scanned: ' + code + '</div>');
+
+
+        // Make the alert dismiss after one and a half seconds
+        setTimeout(function () {
+            $(".alert").alert('close');
+        }, 1500);
     });
 });
 
 /**
- * Sign into Google.
- */
-function login() {
-    // Set auth to be persistent and need logout to clear user login 
-    firebase.auth().setPersistence(firebase.auth.Auth.Persistence.LOCAL);
+*  Get the date in the proper format.
+*/
+function getDate() {
+    var today = new Date();
+ 
+    // Get date information
+    var month = today.getMonth() + 1;
+    var day = today.getDate();
+    var year = today.getFullYear().toString().substring(2, 4);
+ 
+    // Add padding to month
+    if (month < 10) month = "0" + month;
+ 
+    // Add padding to day
+    if (day < 10) day = "0" + day;
 
-    // Sign in with Google Auth Provider
-    var provider = new firebase.auth.GoogleAuthProvider();
-    firebase.auth().signInWithRedirect(provider);
+    return month + "/" + day + "/" + year;
 }
 
-/**
- * Logout from Google.
- */
-function logout() {
-    firebase.auth().signOut().then(function() {
-        console.log("Sign out successful.");
-    }).catch(function(error) {
-        console.error(error.code + ": " + error.message);
-    });
-}
 
 /**
- * A helper function to replace all instances of a substring in a string.
- */
-String.prototype.replaceAll = function (search, replacement) {
-    var target = this;
-    return target.replace(new RegExp(search, 'g'), replacement);
-};
+*  Get the time in the proper format.
+*/
+function getTime() {
+    var today = new Date();
+
+    // Get time information
+    var hour = today.getHours();
+    var mins = today.getMinutes();
+    var secs = today.getSeconds();
+
+    // Add padding to hour
+    if (hour < 10) hour = "0" + hour;
+ 
+    // Add padding to minutes
+    if (mins < 10) mins = "0" + mins;
+    else if (mins === 0) mins = "00";
+ 
+    // Add padding to seconds
+    if (secs < 10) secs = "0" + secs;
+    else if (secs === 0) secs = "00";
+
+    return hour + ":" + mins + ":" + secs;
+}
