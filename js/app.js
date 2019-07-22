@@ -88,11 +88,11 @@ function launchBarcodeCamera() {
     /**
     * Get all the video devices that the web browser can access.
     */
-    Quagga.CameraAccess.enumerateVideoDevices().then(function (devices) {
+    Quagga.CameraAccess.enumerateVideoDevices().then(function(devices) {
         var deviceId;
 
         // If there is a back camera use it, otherwise just use whatever camera there is
-        devices.forEach(function (device) {
+        devices.forEach(function(device) {
             // If it is the back camera, automatically use that
             if (device.label == "Back Camera") {
                 deviceId = device.deviceId;
@@ -156,33 +156,38 @@ Quagga.onDetected(function(result) {
     // Get the detected barcode
     var code = result.codeResult.code;
 
-    // If this code has already been scanned, do not proceed
-    if (scannedCodes.includes(code)) return;
+    // If this code has already been scanned or is not valid, do not proceed
+    if (scannedCodes.includes(code) || code.substring(0, 1) != "A" 
+        || code.substring(code.length - 1) != "A" || code.length != 16) return;
 
-    // Add code to scannedCodes array to keep track of itt
-    scannedCodes.append(code);
+    // Add code to scannedCodes array to keep track of it
+    scannedCodes.push(code);
 
     // Create row in same format as what the physical scanner outputs
-    var body = { values: [getDate(), getTime(), "02", code] };
+    var body =  { values: [ [getDate(), getTime(), "02", code] ] };
 
     // Append the row to the spreadsheet
     gapi.client.sheets.spreadsheets.values.append({
-        spreadsheetId: spreadsheetId,
-        range: range,
-        valueInputOption: valueInputOption,
+        spreadsheetId: spreadsheetID,
+        range: "Sheet1!A:A",
+        valueInputOption: "RAW",
         resource: body
     })
     .then(function(response) {
         var result = response.result;
 
-        // Show a success alert with the code that was scanned
-        $(".container-fluid").prepend('<div class="alert alert-success" role="alert">Scanned: ' + code + '</div>');
+        // Log any errors
+        if (result.error) 
+            console.err(result.error.message);
+        else {
+            // Show a success alert with the code that was scanned
+            $(".container-fluid").prepend('<div class="alert alert-success" role="alert">Scanned: ' + code + '</div>');
 
-
-        // Make the alert dismiss after one and a half seconds
-        setTimeout(function () {
-            $(".alert").alert('close');
-        }, 1500);
+            // Make the alert dismiss after one and a half seconds
+            setTimeout(function () {
+                $(".alert").alert('close');
+            }, 3000);
+        }
     });
 });
 
