@@ -10,17 +10,51 @@
     <body>
         <div class="container-fluid">
             <h1 class="text-center mt-3">Welcome to Scanner</h1>
-            <p class="text-center">
-                Scan UMBC Student Cards for your event.
-            </p>
 
-            <button class="btn btn-primary" id="login_button">Login</button>
-            <button class="btn btn-primary" id="signout_button">Logout</button>
+            <div id="signedOut">
+                <p class="text-center">
+                    Scan UMBC Student Cards for your event.
+                </p>  
 
-            <button class="btn btn-success" onclick="startScanning()" id="createEvent">Start Scanning</button>
+                <h3>Why Use This Application?</h3>
+                <ul>
+                    <li>
+                        It is scary to rent out a card scanner because they carry a costly replacement fee if lost.
+                    </li>
+                    <li>
+                        There are not enough card scanners to go around so you are not guaranteed to have them at your event.
+                    </li>
+                    <li>
+                        You can equip as many people as you need to with the Scanner app.
+                    </li>
+                    <li>
+                        If you share the Scanned ID's sheet with other users on Google Drive, you can all sync to the same document when using the Scanner app.
+                    </li>
+                    <li>
+                        If it is just for a GBM, sometimes its too much hassle to check out a card scanner.
+                    </li>
+                </ul>
 
-            <!-- Barcode Scanning Camera -->
-            <div id="interactive" class="viewport embed-responsive" style="display: none"></div>
+                <p class="text-center">
+                    <button class="btn btn-lg btn-primary" id="login_button">Login</button>
+                </p>
+            </div>
+
+            <div id="signedIn">
+                <button class="btn btn-primary mb-3" id="signout_button">Logout</button>
+
+                <p id="app_brief">
+                    When you press the Start Scanning button, this app will automatically check for a spreadsheet in the format of Today's Date + Scanned ID's. If a sheet like that has already been shared with you, or you have already used the application today, it will select that. If that is not the case for you, it will create a new document automatically.
+                </p>
+
+                <p class="text-center">
+                    <button class="btn btn-lg btn-success" onclick="startScanning()" id="startScanning">Start Scanning</button>
+                </p>
+                
+
+                <!-- Barcode Scanning Camera -->
+                <div id="interactive" class="viewport embed-responsive" style="display: none"></div>
+            </div> 
         </div>
         
         <!-- Bootstrap Scripts -->

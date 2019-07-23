@@ -58,12 +58,12 @@ function updateSigninStatus(isSignedIn) {
     isLoggedIn = isSignedIn;
 
     if (isSignedIn) {
-        loginButton.style.display = 'none';
-        signoutButton.style.display = 'block';
+        document.getElementById("signedOut").style.display = 'none';
+        document.getElementById("signedIn").style.display = 'block';
     } 
     else {
-        loginButton.style.display = 'block';
-        signoutButton.style.display = 'none';
+        document.getElementById("signedOut").style.display = 'block';
+        document.getElementById("signedIn").style.display = 'none';
     }
 }
 
@@ -129,6 +129,9 @@ function launchBarcodeCamera() {
 *  Launch the barcode scanning camera and create the event Google Sheet.
 */
 function startScanning() {
+    $("#app_brief").hide();
+    $("#startScanning").hide();
+    
     // Launch the barcode scanning camera 
     launchBarcodeCamera();
 
