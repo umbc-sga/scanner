@@ -4,15 +4,15 @@ var isLoggedIn = false;
 var scannedCodes = [];
 
 // Client ID and API key from the Developer Console
-var CLIENT_ID = '472938835007-rrt6ml2b8ddt23s8aa1ntop144l2nbu8.apps.googleusercontent.com';
-var API_KEY = 'AIzaSyDf-X1sVw3JHo81BHNzYEE8nb7Slk0jmnU';
+var CLIENT_ID = '';
+var API_KEY = '';
 
 // Array of API discovery doc URLs for APIs used by the quickstart
-var DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4"];
+var DISCOVERY_DOCS = ["https://sheets.googleapis.com/$discovery/rest?version=v4", "https://www.googleapis.com/discovery/v1/apis/drive/v3/rest"];
 
 // Authorization scopes required by the API; multiple scopes can be
 // included, separated by spaces.
-var SCOPES = "https://www.googleapis.com/auth/spreadsheets";
+var SCOPES = "https://www.googleapis.com/auth/spreadsheets https://www.googleapis.com/auth/drive.readonly";
 
 // Signin/signout buttons
 var loginButton = document.getElementById('login_button');
@@ -136,15 +136,28 @@ function startScanning() {
     var today = new Date();
     var fileName = (today.getMonth() + 1) + "/" + today.getDate() + "/" + today.getFullYear() + " Scanned IDs";
 
-    // Create the spreadsheet with the Sheets API
-    gapi.client.sheets.spreadsheets.create({
-        properties: {
-            title: fileName
-        }
+    // Check all the files from user's Drive (personal or shared) if they
+    // are named like a scanner log and if they are not in the trash
+    gapi.client.drive.files.list({
+        q: "name contains '" + fileName + "' and trashed = false"
     })
     .then(function(response) {
-        // Get spreadsheet ID
-        spreadsheetID = response.result.spreadsheetId;
+        // If a file with the proper file name already exists, use that one
+        if (response.result.files) 
+            spreadsheetID = response.result.files[0].id;
+        // If no scanner log has been created yet
+        else {
+            // Create the spreadsheet with the Sheets API
+            gapi.client.sheets.spreadsheets.create({
+                properties: {
+                    title: fileName
+                }
+            })
+            .then(function(response) {
+                // Get spreadsheet ID
+                spreadsheetID = response.result.spreadsheetId;
+            });
+        }
     });
 }
 
@@ -158,7 +171,18 @@ Quagga.onDetected(function(result) {
 
     // If this code has already been scanned or is not valid, do not proceed
     if (scannedCodes.includes(code) || code.substring(0, 1) != "A" 
-        || code.substring(code.length - 1) != "A" || code.length != 16) return;
+        || code.substring(code.length - 1) != "A" || code.length != 16) {
+        // Show a success alert with the code that was scanned
+        $(".alert").alert('close');
+        $(".container-fluid").prepend('<div class="alert alert-warning" role="alert">Code partial detected, please try getting a better view of it.</div>');
+
+        // Make the alert dismiss after one and a half seconds
+        setTimeout(function () {
+            $(".alert").alert('close');
+        }, 1000);
+
+        return;
+    }
 
     // Add code to scannedCodes array to keep track of it
     scannedCodes.push(code);
